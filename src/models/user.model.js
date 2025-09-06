@@ -46,8 +46,8 @@ const userSchema = new Mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["dummy", "dummy2", "dummy3"], // Define user roles
-      default: "dummy",
+      enum: ["admin", "manager", "cashier", "inventory", "viewer"], // Updated roles for stock management
+      default: "cashier",
     },
     // OAuth fields
     provider: {

@@ -25,12 +25,24 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(409, "User with email or username already exists");
   }
 
+  // Set default role to cashier if not provided or if trying to set admin role
+  let userRole = role;
+  if (!userRole || userRole === "admin") {
+    userRole = "cashier"; // Default role
+  }
+  
+  // Validate role
+  const validRoles = ["manager", "cashier", "inventory", "viewer"];
+  if (!validRoles.includes(userRole)) {
+    userRole = "cashier"; // Default to cashier if invalid role
+  }
+
   const user = await User.create({
     fullName,
     email,
     password,
     username,
-    role,
+    role: userRole,
     isVerified: false
   });
 
@@ -305,6 +317,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
       "User profile fetched successfully"
     ));
 });
+
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
@@ -409,16 +422,57 @@ const resetPassword = asyncHandler(async (req, res) => {
     );
 });
 
+// Verify password reset OTP without changing password
+const verifyResetOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    throw new ApiError(400, "Email and OTP are required");
+  }
+
+  // Find the user by email
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+  
+  // Check if the user registered through social login
+  if (user.provider) {
+    throw new ApiError(400, "Password reset is not available for accounts created with social login. Please log in using your social account.");
+  }
+
+  // Find password reset record
+  const passwordReset = await PasswordReset.findOne({
+    user: user._id,
+    email,
+    otp
+  });
+
+  if (!passwordReset) {
+    throw new ApiError(400, "Invalid or expired OTP");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new apiResponse(
+        200,
+        {},
+        "OTP verified successfully"
+      )
+    );
+});
+
 export {
   registerUser,
   loginUser,
   logoutUser,
   verifyOTP,
+  verifyResetOTP,
   resendOTP,
   getCurrentUser,
   forgotPassword,
   resetPassword
 }
-
-// Forgot password - send reset OTP
 

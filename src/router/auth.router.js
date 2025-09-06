@@ -5,6 +5,7 @@ import {
     loginUser,
     logoutUser,
     verifyOTP,
+    verifyResetOTP,
     resendOTP,
     forgotPassword,
     resetPassword,
@@ -18,6 +19,7 @@ router.route("/register").post(registerUser);
 router.route("/login").post(loginUser);
 router.route("/logout").post(verifyJWT, logoutUser);
 router.route("/verify-otp").post(verifyOTP);
+router.route("/verify-reset-otp").post(verifyResetOTP);
 router.route("/resend-otp").post(resendOTP);
 router.route("/forgot-password").post(forgotPassword);
 router.route("/reset-password").post(resetPassword);

@@ -6,7 +6,7 @@ import { apiResponse } from "../utils/apiResponse.js";
 // Get all users (admin function)
 const getAllUsers = asyncHandler(async (req, res) => {
   // Ensure the requester is an admin
-  if (req.user.role !== "dummy3") {
+  if (req.user.role !== "admin") {
     throw new ApiError(403, "You don't have permission to access this resource");
   }
   
@@ -49,7 +49,7 @@ const getUserById = asyncHandler(async (req, res) => {
   const userId = req.params.id;
   
   // Ensure the requester is an admin or the user themselves
-  if (req.user.role !== "dummy3" && req.user._id.toString() !== userId) {
+  if (req.user.role !== "admin" && req.user._id.toString() !== userId) {
     throw new ApiError(403, "You don't have permission to access this resource");
   }
   
@@ -72,19 +72,42 @@ const getUserById = asyncHandler(async (req, res) => {
 
 // Update user account details
 const updateAccountDetails = asyncHandler(async (req, res) => {
-  const { fullName } = req.body;
+  const { fullName, email, username } = req.body;
   
   if (!fullName?.trim()) {
     throw new ApiError(400, "Full name is required");
   }
   
+  const updateFields = {
+    fullName: fullName
+  };
+  
+  // Only update email and username if provided and different from current values
+  const currentUser = await User.findById(req.user._id);
+  
+  if (email && email !== currentUser.email) {
+    // Check if email is already in use
+    const emailExists = await User.findOne({ email, _id: { $ne: req.user._id } });
+    if (emailExists) {
+      throw new ApiError(409, "Email is already in use");
+    }
+    updateFields.email = email;
+    // Reset verification if email changes
+    updateFields.isVerified = false;
+  }
+  
+  if (username && username !== currentUser.username) {
+    // Check if username is already in use
+    const usernameExists = await User.findOne({ username, _id: { $ne: req.user._id } });
+    if (usernameExists) {
+      throw new ApiError(409, "Username is already in use");
+    }
+    updateFields.username = username;
+  }
+  
   const user = await User.findByIdAndUpdate(
     req.user._id,
-    {
-      $set: {
-        fullName: fullName
-      }
-    },
+    { $set: updateFields },
     { new: true }
   ).select("-password -refreshToken");
   
@@ -174,10 +197,51 @@ const deleteAccount = asyncHandler(async (req, res) => {
     );
 });
 
+// Update user role (admin only)
+const updateUserRole = asyncHandler(async (req, res) => {
+  const { userId, role } = req.body;
+  
+  // Ensure the requester is an admin
+  if (req.user.role !== "admin") {
+    throw new ApiError(403, "You don't have permission to perform this action");
+  }
+  
+  if (!userId || !role) {
+    throw new ApiError(400, "User ID and role are required");
+  }
+  
+  // Validate role
+  const validRoles = ["admin", "manager", "cashier", "inventory", "viewer"];
+  if (!validRoles.includes(role)) {
+    throw new ApiError(400, `Invalid role. Role must be one of: ${validRoles.join(', ')}`);
+  }
+  
+  const user = await User.findById(userId);
+  
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+  
+  // Update role
+  user.role = role;
+  await user.save();
+  
+  return res
+    .status(200)
+    .json(
+      new apiResponse(
+        200,
+        { user: { _id: user._id, fullName: user.fullName, email: user.email, role: user.role } },
+        "User role updated successfully"
+      )
+    );
+});
+
 export {
   getAllUsers,
   getUserById,
   updateAccountDetails,
   changePassword,
-  deleteAccount
+  deleteAccount,
+  updateUserRole
 }
